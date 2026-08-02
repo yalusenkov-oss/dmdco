@@ -77,6 +77,11 @@ function formatDate(value: string) {
   return new Date(`${value}T00:00:00`).toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" });
 }
 
+function currentDate() {
+  const now = new Date();
+  return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
+}
+
 function display(value: string, fallback = "________________") {
   return value.trim() || fallback;
 }
@@ -120,7 +125,7 @@ export default function Home() {
   const [hydrated, setHydrated] = useState(false);
   const [active, setActive] = useState("objects"); const [savedAt, setSavedAt] = useState(""); const [toast, setToast] = useState("");
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = currentDate();
     let saved: Partial<Contract> = {};
     try {
       const raw = window.localStorage.getItem("pfv-contract-draft");
