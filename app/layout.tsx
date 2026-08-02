@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PFVFORM — конструктор лицензионных договоров",
+  title: "Лицензионный договор — заполнение",
   description: "Заполните лицензионный договор PFVMUSIC и проверьте его в живом предпросмотре.",
   icons: {
     icon: "/favicon.svg",
