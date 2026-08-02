@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Лицензионный договор — заполнение",
-  description: "Заполните лицензионный договор PFVMUSIC и проверьте его в живом предпросмотре.",
+  description: "Заполните лицензионный договор Dream Motion и проверьте его в предпросмотре.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
