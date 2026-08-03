@@ -22,6 +22,7 @@
 .paper-topline { color:#7f8b90; border-color:#d8dfe2; }
 .paper-footer { border-color:#d8dfe2; color:#879399; }
 .paper-break { border-color:#d2dadd; }
+.signature-image { display:block; width:130px; height:56px; object-fit:contain; object-position:left bottom; margin:0 0 4px; }
 /* Responsive layout corrections */
 body { overflow-x:hidden; }
 .workspace { grid-template-columns:minmax(210px,244px) minmax(0,560px) minmax(0,1fr); }
