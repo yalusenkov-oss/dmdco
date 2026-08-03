@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 type Track = { title: string; musicAuthor: string; lyricsAuthor: string; noLyrics: boolean };
 type SignatureMethod = "manual" | "facsimile" | "online";
@@ -23,7 +23,6 @@ type Contract = {
   noLyrics: boolean;
   tracks: Track[];
   signatureMethod: SignatureMethod;
-  drawnSignature: string;
 };
 
 const LICENSEE = {
@@ -42,9 +41,9 @@ const LICENSEE = {
 
 const SIGNATURE_SRC = "/signature-kurochkin.png";
 const SIGNATURE_METHOD_LABELS: Record<SignatureMethod, string> = {
-  manual: "Собственноручно",
-  facsimile: "Факсимиле по соглашению сторон",
-  online: "Онлайн-сервис с фиксацией подписания",
+  manual: "Печать и скан",
+  facsimile: "Факсимиле администратора",
+  online: "Онлайн-сервис",
 };
 
 const initial: Contract = {
@@ -67,7 +66,6 @@ const initial: Contract = {
   noLyrics: false,
   tracks: [{ title: "", musicAuthor: "", lyricsAuthor: "", noLyrics: false }],
   signatureMethod: "facsimile",
-  drawnSignature: "",
 };
 
 function normalizeTracks(raw: unknown, legacy: Partial<Contract> = {}): Track[] {
@@ -87,13 +85,6 @@ function normalizeTracks(raw: unknown, legacy: Partial<Contract> = {}): Track[] 
     };
   });
 }
-
-const sections = [
-  { id: "objects", number: "01", label: "Объекты" },
-  { id: "licensor", number: "02", label: "Лицензиар" },
-  { id: "terms", number: "03", label: "Условия" },
-  { id: "details", number: "04", label: "Реквизиты" },
-];
 
 function formatDate(value: string) {
   if (!value) return "«___» __________ 2026 г.";
@@ -117,64 +108,6 @@ function SectionTitle({ number, title, caption }: { number: string; title: strin
   return <div className="section-title"><span className="section-number">{number}</span><div><h2>{title}</h2><p>{caption}</p></div></div>;
 }
 
-function SignaturePad({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawingRef = useRef(false);
-  const drawImage = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const context = canvas.getContext("2d");
-    if (!context) return;
-    context.fillStyle = "#fff";
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    if (!value) return;
-    const image = new Image();
-    image.onload = () => context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    image.src = value;
-  };
-  useEffect(drawImage, [value]);
-  const point = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const bounds = canvas.getBoundingClientRect();
-    return { x: (event.clientX - bounds.left) * canvas.width / bounds.width, y: (event.clientY - bounds.top) * canvas.height / bounds.height };
-  };
-  const start = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    const context = canvas?.getContext("2d");
-    if (!canvas || !context) return;
-    canvas.setPointerCapture(event.pointerId);
-    const { x, y } = point(event);
-    context.beginPath();
-    context.moveTo(x, y);
-    context.strokeStyle = "#111";
-    context.lineWidth = 3;
-    context.lineCap = "round";
-    context.lineJoin = "round";
-    drawingRef.current = true;
-  };
-  const move = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!drawingRef.current) return;
-    const canvas = canvasRef.current;
-    const context = canvas?.getContext("2d");
-    if (!canvas || !context) return;
-    const { x, y } = point(event);
-    context.lineTo(x, y);
-    context.stroke();
-  };
-  const finish = () => {
-    if (!drawingRef.current) return;
-    drawingRef.current = false;
-    const canvas = canvasRef.current;
-    if (canvas) onChange(canvas.toDataURL("image/png"));
-  };
-  const clear = () => {
-    onChange("");
-    drawImage();
-  };
-  return <div className="signature-pad-wrap"><canvas ref={canvasRef} className="signature-pad" width={640} height={180} onPointerDown={start} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish} aria-label="Поле для рисования подписи" /><button type="button" className="text-button" onClick={clear}>Очистить подпись</button></div>;
-}
-
 function DocumentPreview({ data }: { data: Contract }) {
   const tracks = data.tracks.filter((track) => track.title.trim());
   const objects: Track[] = tracks.length ? tracks : [{
@@ -183,14 +116,13 @@ function DocumentPreview({ data }: { data: Contract }) {
     lyricsAuthor: data.lyricsAuthor,
     noLyrics: data.noLyrics,
   }];
-  const signatureAsset = data.signatureMethod === "facsimile" ? SIGNATURE_SRC : data.signatureMethod === "online" ? data.drawnSignature : "";
-  const signatureCaption = data.signatureMethod === "facsimile" ? "________________ / ФИО · факсимиле" : data.signatureMethod === "online" ? "________________ / ФИО · онлайн" : "________________ / ФИО";
-  const signingSentence = data.signatureMethod === "facsimile"
-    ? "Стороны подписывают Договор собственноручно либо с использованием факсимильного воспроизведения подписи при наличии отдельного соглашения о порядке его применения."
-    : data.signatureMethod === "online"
-      ? "Стороны подписывают Договор через выбранный сервис подписания, который позволяет достоверно определить подписанта, содержание документа и момент подписания; порядок признания такого способа равнозначным собственноручной подписи согласуется Сторонами отдельно. Изображение, созданное во встроенном поле, само по себе не является электронной подписью."
-      : "Договор заключается в письменной форме и подписывается Сторонами собственноручно.";
-  const signatureMark = signatureAsset ? <img className="signature-image" src={signatureAsset} alt="Графическое изображение подписи" /> : null;
+  const signatureCaption = "________________ / ФИО";
+  const signingSentence = data.signatureMethod === "online"
+    ? "Лицензиат формирует экземпляр Договора с факсимильным воспроизведением своей подписи и направляет его Лицензиару. Лицензиар подписывает полученный экземпляр через согласованный онлайн-сервис, позволяющий установить подписанта, содержание документа и момент подписания, после чего направляет подтверждение или подписанный экземпляр Лицензиату. Стороны заранее согласовали такой порядок подписания и обмена документами."
+    : data.signatureMethod === "manual"
+      ? "Лицензиат формирует экземпляр Договора с факсимильным воспроизведением своей подписи и направляет его Лицензиару. Лицензиар распечатывает экземпляр, подписывает его собственноручно и направляет Лицензиату оригинал или скан-копию подписанного документа. Стороны заранее согласовали такой порядок подписания и обмена документами."
+      : "Лицензиат формирует экземпляр Договора с факсимильным воспроизведением своей подписи и направляет его Лицензиару. Лицензиар подписывает полученный экземпляр собственноручно либо через согласованный Сторонами онлайн-сервис, после чего направляет Лицензиату оригинал, скан-копию или подтверждение подписания. Стороны заранее согласовали такой порядок подписания и обмена документами.";
+  const signatureMark = <img className="signature-image" src={SIGNATURE_SRC} alt="Факсимильное воспроизведение подписи Курочкина Артема Андреевича" />;
   return <article className="paper" id="document-preview">
     <header className="paper-header"><h1>ЛИЦЕНЗИОННЫЙ ДОГОВОР DREAM MOTION</h1><div className="paper-contract-number">№ {display(data.contractNumber, "ОБРАЗЕЦ")}</div><div className="paper-meta"><span>г. Санкт-Петербург</span><span>Дата договора: {formatDate(data.contractDate)}</span></div></header>
     <p className="indent"><b>{display(data.licensorName)}</b> (паспорт: {display(data.passportSeriesNumber)}, выдан {display(data.passportIssuedBy)}, дата выдачи {formatDate(data.passportIssueDate)}), именуемый в дальнейшем «Лицензиар», с одной стороны, и {LICENSEE.name}, физическое лицо, именуемый в дальнейшем «Лицензиат», с другой стороны, совместно именуемые «Стороны», заключили настоящий договор о нижеследующем.</p>
@@ -200,19 +132,19 @@ function DocumentPreview({ data }: { data: Contract }) {
     <h3>4. ВОЗНАГРАЖДЕНИЕ И ОТЧЁТНОСТЬ</h3><p><b>4.1.</b> Доля Лицензиара и минимальная сумма выплаты определены в Дополнительном соглашении, являющемся частью Договора.</p><p><b>4.2.</b> Вознаграждение рассчитывается от чистых поступлений, фактически полученных Лицензиатом от использования Объектов, после удержанных цифровыми платформами комиссий, налогов, возвратов и расходов на конвертацию валюты.</p><p><b>4.3.</b> По запросу Лицензиара Лицензиат предоставляет отчёт не позднее 30 рабочих дней с даты получения запроса.</p><p><b>4.4.</b> Выплата производится в рублях в течение 30 рабочих дней после получения запроса и достижения установленной минимальной суммы. Остаток ниже порога переносится на следующие периоды.</p>
     <h3>5. ГАРАНТИИ И ПРЕТЕНЗИИ</h3><p><b>5.1.</b> Лицензиар гарантирует, что обладает в полном объёме исключительными имущественными правами на все передаваемые Объекты, включая музыкальные произведения, тексты, исполнения, фонограммы, обложку и иные материалы релиза.</p><p><b>5.2.</b> Указанные права не отчуждены, не заложены и не обременены ранее выданными лицензиями, препятствующими исполнению Договора.</p><p><b>5.3.</b> Лицензиар гарантирует достоверность сведений об авторах и исполнителях, а также законность использованных фонограмм, семплов, текстов, изображений и иных материалов.</p>
     <h3>6. СРОК И ПРЕКРАЩЕНИЕ</h3><p><b>6.1.</b> Обычное одностороннее досрочное расторжение до истечения первоначального четырёхлетнего срока не допускается.</p><p><b>6.2.</b> После первоначального четырёхлетнего срока Договор автоматически продлевается каждый раз на один год, если Лицензиар не направит через систему тикетов уведомление об отказе от продления не позднее чем за 30 календарных дней.</p><p><b>6.3.</b> В уведомлении об отказе от продления Лицензиар указывает выбранный способ прекращения распространения: удаление Объектов либо их перенос к другому дистрибьютору.</p>
-    <h3>7. ПОДПИСАНИЕ ДОГОВОРА</h3><p><b>7.1.</b> {signingSentence} Каждый экземпляр, подписанный Стороной, имеет одинаковую юридическую силу в пределах выбранного и согласованного Сторонами способа.</p><p><b>7.2.</b> Датой договора считается дата его создания, указанная в заголовке документа. Изменения и дополнения оформляются в письменной форме и подписываются обеими Сторонами.</p><p><b>7.3.</b> Подписанный экземпляр передаётся другой Стороне лично, курьером или иным согласованным способом.</p>
+    <h3>7. ПОДПИСАНИЕ ДОГОВОРА</h3><p><b>7.1.</b> {signingSentence} Каждый экземпляр, подписанный Стороной, имеет одинаковую юридическую силу в пределах выбранного и согласованного Сторонами способа.</p><p><b>7.2.</b> Стороны признают согласованный обмен оригиналом, скан-копией или подтверждением онлайн-сервиса способом передачи подписанного экземпляра. По требованию любой Стороны оригинал предоставляется другой Стороне.</p><p><b>7.3.</b> Датой договора считается дата его создания, указанная в заголовке документа. Изменения и дополнения оформляются в письменной форме и подписываются обеими Сторонами.</p><p><b>7.4.</b> Факсимильное воспроизведение подписи Лицензиата применяется по предварительному соглашению Сторон о таком порядке подписания.</p>
     <h3>8. ЗАКЛЮЧИТЕЛЬНЫЕ ПОЛОЖЕНИЯ</h3><p><b>8.1.</b> К Договору применяется законодательство Российской Федерации. До обращения в суд Сторона направляет претензию, срок ответа — 15 рабочих дней.</p><p><b>8.2.</b> Персональные данные обрабатываются в объёме, необходимом для заключения и исполнения Договора, расчётов и выполнения требований законодательства.</p><p><b>8.3.</b> Приложение № 1 имеет приоритет в части состава и идентификации Объектов, Дополнительное соглашение — в части условий выплаты, доли Лицензиара и минимальной суммы выплаты.</p>
-    <h3>9. РЕКВИЗИТЫ И ПОДПИСИ</h3><div className="signature-grid"><div><span>ЛИЦЕНЗИАР</span><strong>{display(data.licensorName)}</strong><p>Паспорт: {display(data.passportSeriesNumber)}<br />Выдан: {display(data.passportIssuedBy)}<br />Дата выдачи: {formatDate(data.passportIssueDate)}<br />Банковские реквизиты: {display(data.bankDetails)}<br />Email: {display(data.email)}</p><div className="signature-space" /><i>{signatureCaption}</i></div><div><span>ЛИЦЕНЗИАТ</span><strong>{LICENSEE.name}</strong><p>Дата рождения: {LICENSEE.birthDate}<br />Паспорт: {LICENSEE.passport}<br />Выдан: {LICENSEE.passportIssuedBy}<br />ИНН: {LICENSEE.inn}<br />Расчётный счёт: {LICENSEE.account}<br />Банк: {LICENSEE.bank}<br />БИК: {LICENSEE.bik}<br />Город банка: {LICENSEE.bankCity}<br />Корр. счёт: {LICENSEE.correspondentAccount}<br />Email: {LICENSEE.email}</p><div className="signature-space">{signatureMark}</div><i>{signatureCaption}</i></div></div>
+    <h3>9. РЕКВИЗИТЫ И ПОДПИСИ</h3><div className="signature-grid"><div><span>ЛИЦЕНЗИАР</span><strong>{display(data.licensorName)}</strong><p>Паспорт: {display(data.passportSeriesNumber)}<br />Выдан: {display(data.passportIssuedBy)}<br />Дата выдачи: {formatDate(data.passportIssueDate)}<br />Банковские реквизиты: {display(data.bankDetails)}<br />Email: {display(data.email)}</p><div className="signature-space" /><i>{signatureCaption}</i></div><div><span>ЛИЦЕНЗИАТ</span><strong>{LICENSEE.name}</strong><p>Дата рождения: {LICENSEE.birthDate}<br />Паспорт: {LICENSEE.passport}<br />Выдан: {LICENSEE.passportIssuedBy}<br />ИНН: {LICENSEE.inn}<br />Расчётный счёт: {LICENSEE.account}<br />Банк: {LICENSEE.bank}<br />БИК: {LICENSEE.bik}<br />Город банка: {LICENSEE.bankCity}<br />Корр. счёт: {LICENSEE.correspondentAccount}<br />Email: {LICENSEE.email}</p><div className="signature-space">{signatureMark}</div><i>{signatureCaption} · факсимиле</i></div></div>
     <div className="paper-break" />
     <h1 className="appendix-title">ПРИЛОЖЕНИЕ № 1<br /><small>к договору DREAM MOTION № {display(data.contractNumber, "ОБРАЗЕЦ")}</small></h1><h2>ПЕРЕЧЕНЬ И АКТ ПЕРЕДАЧИ ОБЪЕКТОВ</h2><p><b>Релиз:</b> {display(data.workTitle)}. <b>Исполнитель:</b> {display(data.pseudonym)}. <b>Тип:</b> {data.releaseType}.</p><table className="objects"><thead><tr><th>№</th><th>Название и версия</th><th>Исполнители</th><th>Автор текста</th><th>Автор музыки</th></tr></thead><tbody>{objects.map((track, index) => <tr key={`${track.title}-${index}`}><td>{index + 1}</td><td>{display(track.title, "Название трека")}</td><td>{display(data.pseudonym)}</td><td>{track.noLyrics ? "Инструментал" : display(track.lyricsAuthor)}</td><td>{display(track.musicAuthor)}</td></tr>)}</tbody></table><p><b>1.</b> Лицензиар передал, а Лицензиат принял перечисленные Объекты и сведения о них через информационную систему Лицензиата.</p><p><b>2.</b> Лицензиар подтверждает достоверность перечня и принадлежность ему прав, необходимых для предоставления лицензии по Договору.</p><p><b>3.</b> Приложение составлено в письменной форме и является неотъемлемой частью Договора.</p>
-    <div className="paper-break" /><h1 className="appendix-title">ДОПОЛНИТЕЛЬНОЕ СОГЛАШЕНИЕ<br /><small>к договору DREAM MOTION № {display(data.contractNumber, "ОБРАЗЕЦ")}</small></h1><p><b>1.</b> Для релиза «{display(data.workTitle)}» применяются индивидуальные условия.</p><p><b>2.</b> Вознаграждение Лицензиара составляет <b>{data.artistShare}%</b> чистых поступлений, рассчитанных в соответствии с разделом 4 Договора.</p><p><b>3.</b> Минимальная накопленная сумма для выплаты определяется Сторонами отдельно.</p><p><b>4.</b> Невыплаченный остаток сохраняется за Лицензиаром и переносится на следующие расчётные периоды.</p><div className="signature-grid"><div><span>ЛИЦЕНЗИАР</span><strong>{display(data.licensorName)}</strong><div className="signature-space" /><i>{signatureCaption}</i></div><div><span>ЛИЦЕНЗИАТ</span><strong>{LICENSEE.name}</strong><div className="signature-space">{signatureMark}</div><i>{signatureCaption}</i></div></div>
+    <div className="paper-break" /><h1 className="appendix-title">ДОПОЛНИТЕЛЬНОЕ СОГЛАШЕНИЕ<br /><small>к договору DREAM MOTION № {display(data.contractNumber, "ОБРАЗЕЦ")}</small></h1><p><b>1.</b> Для релиза «{display(data.workTitle)}» применяются индивидуальные условия.</p><p><b>2.</b> Вознаграждение Лицензиара составляет <b>{data.artistShare}%</b> чистых поступлений, рассчитанных в соответствии с разделом 4 Договора.</p><p><b>3.</b> Минимальная накопленная сумма для выплаты определяется Сторонами отдельно.</p><p><b>4.</b> Невыплаченный остаток сохраняется за Лицензиаром и переносится на следующие расчётные периоды.</p><div className="signature-grid"><div><span>ЛИЦЕНЗИАР</span><strong>{display(data.licensorName)}</strong><div className="signature-space" /><i>{signatureCaption}</i></div><div><span>ЛИЦЕНЗИАТ</span><strong>{LICENSEE.name}</strong><div className="signature-space">{signatureMark}</div><i>{signatureCaption} · факсимиле</i></div></div>
   </article>;
 }
 
 export default function Home() {
   const [data, setData] = useState<Contract>(initial);
   const [hydrated, setHydrated] = useState(false);
-  const [active, setActive] = useState("objects"); const [savedAt, setSavedAt] = useState(""); const [toast, setToast] = useState("");
+  const [toast, setToast] = useState("");
   useEffect(() => {
     const today = currentDate();
     let saved: Partial<Contract> = {};
@@ -231,14 +163,11 @@ export default function Home() {
   }, []);
   useEffect(() => {
     if (!hydrated) return;
-    const timeout = window.setTimeout(() => { window.localStorage.setItem("pfv-contract-draft", JSON.stringify(data)); setSavedAt(new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })); }, 350);
+    const timeout = window.setTimeout(() => { window.localStorage.setItem("pfv-contract-draft", JSON.stringify(data)); }, 350);
     return () => window.clearTimeout(timeout);
   }, [data, hydrated]);
   const update = <K extends keyof Contract>(key: K, value: Contract[K]) => setData((current) => ({ ...current, [key]: value }));
-  const completeness = useMemo(() => { const hasTrackAuthors = data.tracks.some((track) => track.title.trim() && track.musicAuthor.trim() && (track.noLyrics || track.lyricsAuthor.trim())); const required = [data.workTitle, data.pseudonym, data.licensorName, data.passportSeriesNumber, data.email, hasTrackAuthors ? "yes" : ""]; return Math.round(required.filter(Boolean).length / required.length * 100); }, [data]);
-  const jumpTo = (id: string) => { setActive(id); document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   const showToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2200); };
-  const exportDraft = () => { const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${data.contractNumber || "dream-motion-contract"}.json`; link.click(); URL.revokeObjectURL(url); showToast("Черновик сохранён в файл"); };
   const downloadDocument = async () => {
     const preview = document.getElementById("document-preview");
     if (!preview) return;
@@ -271,15 +200,15 @@ export default function Home() {
   };
   const printDocument = () => window.print();
   return <main className="app-shell">
-    <header className="topbar"><div className="brand"><div className="brand-mark">DM/LM</div><div><strong>DM/LM</strong><span>Лицензионный договор</span></div></div><div className="top-actions"><span className="saved-state"><span className="status-dot" />{savedAt ? `Сохранено в ${savedAt}` : "Автосохранение"}</span><button className="ghost-button" onClick={exportDraft}>Экспорт черновика</button><button className="ghost-button" onClick={printDocument}>Печать / PDF</button><button className="primary-button" onClick={downloadDocument}>Скачать договор</button></div></header>
-    <div className="workspace"><aside className="sidebar"><div className="sidebar-intro"><span className="eyebrow">ЛИЦЕНЗИОННЫЙ ДОГОВОР</span><h1>Заполнение<br /><em>документа</em></h1><p>Заполните данные сторон, произведения и условия выплаты.</p></div><div className="progress-card"><div className="progress-head"><span>Заполнено</span><b>{completeness}%</b></div><div className="progress-track"><span style={{ width: `${completeness}%` }} /></div><small>Черновик сохраняется на этом устройстве</small></div><nav className="steps-nav" aria-label="Разделы договора">{sections.map((section) => <button key={section.id} className={active === section.id ? "active" : ""} onClick={() => jumpTo(section.id)}><span>{section.number}</span>{section.label}<i>→</i></button>)}</nav><div className="tip-card"><span>i</span><div><b>Структура документа</b><p>Основной договор, приложение с объектами и условия выплаты.</p></div></div><div className="sidebar-foot">Лицензионный договор<br /><span>Версия от 30.07.2026</span></div></aside>
-      <section className="form-column"><div className="mobile-doc-actions"><button onClick={() => document.getElementById("document-preview")?.scrollIntoView({ behavior: "smooth" })}>Посмотреть договор ↓</button></div>
+    <header className="topbar"><div className="brand"><div className="brand-mark">DM/LM</div></div><div className="top-actions"><button className="ghost-button" onClick={printDocument}>Печать / PDF</button><button className="primary-button" onClick={downloadDocument}>Скачать договор</button></div></header>
+    <div className="workspace">
+      <section className="form-column">
         <section className="form-section" id="objects"><SectionTitle number="01" title="Объекты договора" caption="Название релиза и треки для Приложения № 1" /><div className="form-grid two"><Field label="Название релиза" value={data.workTitle} onChange={(value) => update("workTitle", value)} placeholder="Например, Последний танец" /><Field label="Исполнитель / псевдоним" value={data.pseudonym} onChange={(value) => update("pseudonym", value)} placeholder="Как указать в договоре" /><label className="field"><span>Тип релиза</span><select value={data.releaseType} onChange={(event) => update("releaseType", event.target.value)}><option>Сингл</option><option>EP</option><option>Альбом</option></select></label></div><div className="tracks-block"><div className="subhead"><div><b>Перечень треков</b><span>Для сингла оставьте одну строку; для EP и альбома добавьте остальные.</span></div><button className="text-button" onClick={() => update("tracks", [...data.tracks, { title: "", musicAuthor: "", lyricsAuthor: "", noLyrics: false }])}>+ Добавить трек</button></div>{data.tracks.map((track, index) => <div className="track-entry" key={index}><div className="track-row simple"><span className="track-index">{String(index + 1).padStart(2, "0")}</span><input aria-label={`Название трека ${index + 1}`} placeholder="Название трека" value={track.title} onChange={(event) => update("tracks", data.tracks.map((item, i) => i === index ? { ...item, title: event.target.value } : item))} />{data.tracks.length > 1 && <button className="remove-button" onClick={() => update("tracks", data.tracks.filter((_, i) => i !== index))}>×</button>}</div><div className="track-authors"><input className="track-inline-input" aria-label={`Автор музыки трека ${index + 1}`} placeholder="Автор музыки / композитор" value={track.musicAuthor} onChange={(event) => update("tracks", data.tracks.map((item, i) => i === index ? { ...item, musicAuthor: event.target.value } : item))} /><input className="track-inline-input" aria-label={`Автор текста трека ${index + 1}`} placeholder="Автор текста" value={track.lyricsAuthor} onChange={(event) => update("tracks", data.tracks.map((item, i) => i === index ? { ...item, lyricsAuthor: event.target.value } : item))} /><label className="check small"><input type="checkbox" checked={track.noLyrics} onChange={(event) => update("tracks", data.tracks.map((item, i) => i === index ? { ...item, noLyrics: event.target.checked } : item))} /><span>Инструментал</span></label></div></div>)}</div></section>
         <section className="form-section" id="licensor"><SectionTitle number="02" title="Лицензиар" caption="Паспортные данные правообладателя — физического лица" /><div className="form-grid two"><Field label="ФИО полностью" value={data.licensorName} onChange={(value) => update("licensorName", value)} placeholder="Иванов Иван Иванович" /><Field label="Серия и номер паспорта" value={data.passportSeriesNumber} onChange={(value) => update("passportSeriesNumber", value)} placeholder="0000 000000" /><Field label="Кем выдан паспорт" value={data.passportIssuedBy} onChange={(value) => update("passportIssuedBy", value)} placeholder="Отделом МВД России..." /><Field label="Дата выдачи" type="date" value={data.passportIssueDate} onChange={(value) => update("passportIssueDate", value)} /></div><div className="privacy-note"><span>i</span><p>Паспортные данные используются только в реквизитах договора.</p></div></section>
         <section className="form-section" id="terms"><SectionTitle number="03" title="Условия выплаты" caption="Укажите долю Лицензиара вручную" /><div className="form-grid two"><Field label="Название условия (необязательно)" value={data.tariff} onChange={(value) => update("tariff", value)} placeholder="Например, индивидуальные условия" /><label className="field"><span>Доля Лицензиара, %</span><input type="number" min="0" max="100" step="0.01" value={data.artistShare} onChange={(event) => update("artistShare", Number(event.target.value))} placeholder="0–100" /></label></div><div className="tariff-row"><div><span className="mini-label">В Дополнительном соглашении</span><strong>{data.tariff || "Индивидуальные условия"} · {data.artistShare}% чистых поступлений</strong></div><span className="term-note">Процент вводится вручную</span></div></section>
-        <section className="form-section" id="details"><SectionTitle number="04" title="Реквизиты" caption="Данные Лицензиара из раздела 9 договора" /><Field label="Электронная почта" type="email" value={data.email} onChange={(value) => update("email", value)} placeholder="you@example.com" /><label className="field full"><span>Банковские реквизиты / номер карты</span><textarea value={data.bankDetails} onChange={(event) => update("bankDetails", event.target.value)} placeholder="Укажите способ получения вознаграждения" rows={3} /></label><label className="field full"><span>Способ подписания договора</span><select value={data.signatureMethod} onChange={(event) => update("signatureMethod", event.target.value as SignatureMethod)}><option value="manual">{SIGNATURE_METHOD_LABELS.manual}</option><option value="facsimile">{SIGNATURE_METHOD_LABELS.facsimile}</option><option value="online">{SIGNATURE_METHOD_LABELS.online}</option></select></label>{data.signatureMethod === "online" && <div className="signature-pad-card"><div><b>Нарисуйте подпись</b><span>Рисунок будет добавлен в предпросмотр как графическое изображение.</span></div><SignaturePad value={data.drawnSignature} onChange={(value) => update("drawnSignature", value)} /></div>}<p className="signature-legal-note">Факсимиле и онлайн-способ применяются только при согласии обеих сторон и при наличии у сервиса подтверждения личности, документа и времени подписания.</p><div className="form-footer"><div><span className="secure-icon">✓</span><span>Проверьте данные перед подписанием<br /><small>Файл договора можно скачать в HTML или сохранить как PDF</small></span></div><button className="primary-button large" onClick={downloadDocument}>Скачать договор <span>↓</span></button></div></section>
+        <section className="form-section" id="details"><SectionTitle number="04" title="Реквизиты" caption="Данные Лицензиара из раздела 9 договора" /><Field label="Электронная почта" type="email" value={data.email} onChange={(value) => update("email", value)} placeholder="you@example.com" /><label className="field full"><span>Банковские реквизиты / номер карты</span><textarea value={data.bankDetails} onChange={(event) => update("bankDetails", event.target.value)} placeholder="Укажите способ получения вознаграждения" rows={3} /></label><label className="field full"><span>Порядок подписания Лицензиаром</span><select value={data.signatureMethod} onChange={(event) => update("signatureMethod", event.target.value as SignatureMethod)}><option value="manual">{SIGNATURE_METHOD_LABELS.manual}</option><option value="facsimile">{SIGNATURE_METHOD_LABELS.facsimile}</option><option value="online">{SIGNATURE_METHOD_LABELS.online}</option></select></label><p className="signature-legal-note">Администратор направляет договор с факсимильной подписью Курочкина. Лицензиар заранее соглашается подписать его собственноручно и вернуть оригинал или скан либо использовать согласованный онлайн-сервис с фиксацией личности, документа и времени подписания.</p><div className="form-footer"><div><span className="secure-icon">✓</span><span>Проверьте данные перед подписанием<br /><small>Файл договора можно скачать в HTML или сохранить как PDF</small></span></div><button className="primary-button large" onClick={downloadDocument}>Скачать договор <span>↓</span></button></div></section>
       </section>
-      <aside className="preview-column"><div className="preview-header"><div><span className="eyebrow">ПРЕДПРОСМОТР</span><h2>Лицензионный договор</h2></div><span className="preview-badge">A4 · {completeness}%</span></div><div className="preview-frame"><DocumentPreview data={data} /></div><div className="preview-note"><span>↗</span><p>В документ подставляются заполненные значения. Пустые поля остаются отмеченными линиями.</p></div></aside>
+      <aside className="preview-column"><div className="preview-frame"><DocumentPreview data={data} /></div></aside>
     </div>{toast && <div className="toast">✓ {toast}</div>}
   </main>;
 }

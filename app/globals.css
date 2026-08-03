@@ -70,4 +70,9 @@ body { background:#f5f5f5; }
 .preview-badge { color:#555; border-color:#c7c7c7; }
 .preview-note span { color:#111; }
 .tip-card,.sidebar-foot,.preview-note { display:none; }
+.workspace { grid-template-columns:minmax(0,640px) minmax(0,1fr); max-width:1480px; }
+.form-column { grid-column:1; }
+.preview-column { grid-column:2; }
+.section-number { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0; border:1px solid #111; color:#111; font:600 10px/1 'DM Mono',monospace; letter-spacing:.08em; }
+@media (max-width:1200px) { .workspace { grid-template-columns:minmax(0,1fr); }.form-column,.preview-column { grid-column:1; }.preview-column { grid-row:auto; } }
 @media print { body { background:white; }.topbar,.sidebar,.form-column,.preview-header,.preview-note,.mobile-doc-actions { display:none !important; }.workspace { display:block; }.preview-column { padding:0; background:white; }.preview-frame { padding:0; box-shadow:none; background:white; }.paper { box-shadow:none; margin:0 auto; min-height:auto; padding:25mm 20mm; font-size:10px; }.paper-topline { display:none; }.paper-footer { margin-top:45px; } }
