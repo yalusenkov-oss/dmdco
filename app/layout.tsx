@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Лицензионный договор — заполнение",
-  description: "Заполните лицензионный договор Dream Motion и проверьте его в предпросмотре.",
+  title: "DM/LM — лицензионный договор",
+  description: "Строгий интерфейс заполнения лицензионного договора.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
