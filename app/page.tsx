@@ -40,6 +40,7 @@ const LICENSEE = {
 };
 
 const SIGNATURE_SRC = "/signature-kurochkin.png";
+const DRAFT_STORAGE_KEY = "dreammotion-contract-draft";
 const SIGNATURE_METHOD_LABELS: Record<SignatureMethod, string> = {
   manual: "Печать и скан",
   facsimile: "Факсимиле администратора",
@@ -49,7 +50,7 @@ const SIGNATURE_METHOD_LABELS: Record<SignatureMethod, string> = {
 const initial: Contract = {
   // Keep the server render deterministic. The creation date is filled after mount.
   contractDate: "",
-  contractNumber: "DM-2026-____",
+  contractNumber: "",
   tariff: "",
   artistShare: 0,
   releaseType: "Сингл",
@@ -96,6 +97,17 @@ function currentDate() {
   return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
 }
 
+function generateContractNumber() {
+  const year = new Date().getFullYear();
+  const random = new Uint32Array(1);
+  if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
+    window.crypto.getRandomValues(random);
+  } else {
+    random[0] = Math.floor(Math.random() * 0xffffffff);
+  }
+  return `DreamMotion-${year}-${String(random[0] % 1_000_000).padStart(6, "0")}`;
+}
+
 function display(value: string, fallback = "________________") {
   return value.trim() || fallback;
 }
@@ -124,7 +136,7 @@ function DocumentPreview({ data }: { data: Contract }) {
       : "Лицензиат формирует экземпляр Договора с факсимильным воспроизведением своей подписи и направляет его Лицензиару. Лицензиар подписывает полученный экземпляр собственноручно либо через согласованный Сторонами онлайн-сервис, после чего направляет Лицензиату оригинал, скан-копию или подтверждение подписания. Стороны заранее согласовали такой порядок подписания и обмена документами.";
   const signatureMark = <img className="signature-image" src={SIGNATURE_SRC} alt="Факсимильное воспроизведение подписи Курочкина Артема Андреевича" />;
   return <article className="paper" id="document-preview">
-    <header className="paper-header"><h1>ЛИЦЕНЗИОННЫЙ ДОГОВОР DREAM MOTION</h1><div className="paper-contract-number">№ {display(data.contractNumber, "ОБРАЗЕЦ")}</div><div className="paper-meta"><span>г. Санкт-Петербург</span><span>Дата договора: {formatDate(data.contractDate)}</span></div></header>
+    <header className="paper-header"><h1>ЛИЦЕНЗИОННЫЙ ДОГОВОР DreamMotion</h1><div className="paper-contract-number">№ {display(data.contractNumber, "ОБРАЗЕЦ")}</div><div className="paper-meta"><span>г. Санкт-Петербург</span><span>Дата договора: {formatDate(data.contractDate)}</span></div></header>
     <p className="indent"><b>{display(data.licensorName)}</b> (паспорт: {display(data.passportSeriesNumber)}, выдан {display(data.passportIssuedBy)}, дата выдачи {formatDate(data.passportIssueDate)}), именуемый в дальнейшем «Лицензиар», с одной стороны, и {LICENSEE.name}, физическое лицо, именуемый в дальнейшем «Лицензиат», с другой стороны, совместно именуемые «Стороны», заключили настоящий договор о нижеследующем.</p>
     <h3>1. ТЕРМИНЫ И ПРЕДМЕТ ДОГОВОРА</h3><p><b>1.1.</b> Объекты — указанные в Приложении № 1 музыкальные произведения, тексты, исполнения, фонограммы, обложка и относящиеся к релизу метаданные.</p><p><b>1.2.</b> Лицензиар предоставляет Лицензиату исключительную лицензию исключительно в отношении способов цифровой дистрибуции, прямо перечисленных в разделе 2 Договора, а Лицензиат принимает Объекты и выплачивает вознаграждение. Права и способы использования, прямо не указанные в Договоре, Лицензиату не предоставляются.</p><p><b>1.3.</b> Территория использования — все страны мира. Первоначальный срок лицензии составляет четыре года с момента подписания Договора обеими Сторонами.</p>
     <h3>2. СПОСОБЫ ИСПОЛЬЗОВАНИЯ</h3><p><b>2.1.</b> Лицензиат вправе воспроизводить Объекты в объёме, необходимом для загрузки, хранения, кодирования, технической проверки и доставки цифровым платформам.</p><p><b>2.2.</b> Лицензиат вправе распространять цифровые экземпляры, доводить Объекты до всеобщего сведения, предоставлять потоковое прослушивание и скачивание, а также совершать через цифровые платформы и их сервисы иные технически необходимые действия, непосредственно связанные с цифровой дистрибуцией.</p><p><b>2.3.</b> Допускаются техническая адаптация формата и громкости без изменения творческого содержания, включение Объектов в каталоги, плейлисты, пользовательские видео и системы идентификации контента, а также использование обложки, метаданных и фрагментов Объектов продолжительностью до 60 секунд для продвижения релиза.</p><p><b>2.4.</b> Лицензиат вправе выдавать сублицензии цифровым платформам, агрегаторам, дистрибьюторам, организациям по управлению правами и техническим партнёрам только в целях исполнения Договора.</p>
@@ -134,10 +146,10 @@ function DocumentPreview({ data }: { data: Contract }) {
     <h3>6. СРОК И ПРЕКРАЩЕНИЕ</h3><p><b>6.1.</b> Обычное одностороннее досрочное расторжение до истечения первоначального четырёхлетнего срока не допускается.</p><p><b>6.2.</b> После первоначального четырёхлетнего срока Договор автоматически продлевается каждый раз на один год, если Лицензиар не направит через систему тикетов уведомление об отказе от продления не позднее чем за 30 календарных дней.</p><p><b>6.3.</b> В уведомлении об отказе от продления Лицензиар указывает выбранный способ прекращения распространения: удаление Объектов либо их перенос к другому дистрибьютору.</p>
     <h3>7. ПОДПИСАНИЕ ДОГОВОРА</h3><p><b>7.1.</b> {signingSentence} Каждый экземпляр, подписанный Стороной, имеет одинаковую юридическую силу в пределах выбранного и согласованного Сторонами способа.</p><p><b>7.2.</b> Стороны признают согласованный обмен оригиналом, скан-копией или подтверждением онлайн-сервиса способом передачи подписанного экземпляра. По требованию любой Стороны оригинал предоставляется другой Стороне.</p><p><b>7.3.</b> Датой договора считается дата его создания, указанная в заголовке документа. Изменения и дополнения оформляются в письменной форме и подписываются обеими Сторонами.</p><p><b>7.4.</b> Факсимильное воспроизведение подписи Лицензиата применяется по предварительному соглашению Сторон о таком порядке подписания.</p>
     <h3>8. ЗАКЛЮЧИТЕЛЬНЫЕ ПОЛОЖЕНИЯ</h3><p><b>8.1.</b> К Договору применяется законодательство Российской Федерации. До обращения в суд Сторона направляет претензию, срок ответа — 15 рабочих дней.</p><p><b>8.2.</b> Персональные данные обрабатываются в объёме, необходимом для заключения и исполнения Договора, расчётов и выполнения требований законодательства.</p><p><b>8.3.</b> Приложение № 1 имеет приоритет в части состава и идентификации Объектов, Дополнительное соглашение — в части условий выплаты, доли Лицензиара и минимальной суммы выплаты.</p>
-    <h3>9. РЕКВИЗИТЫ И ПОДПИСИ</h3><div className="signature-grid"><div><span>ЛИЦЕНЗИАР</span><strong>{display(data.licensorName)}</strong><p>Паспорт: {display(data.passportSeriesNumber)}<br />Выдан: {display(data.passportIssuedBy)}<br />Дата выдачи: {formatDate(data.passportIssueDate)}<br />Банковские реквизиты: {display(data.bankDetails)}<br />Email: {display(data.email)}</p><div className="signature-space" /><i>{signatureCaption}</i></div><div><span>ЛИЦЕНЗИАТ</span><strong>{LICENSEE.name}</strong><p>Дата рождения: {LICENSEE.birthDate}<br />Паспорт: {LICENSEE.passport}<br />Выдан: {LICENSEE.passportIssuedBy}<br />ИНН: {LICENSEE.inn}<br />Расчётный счёт: {LICENSEE.account}<br />Банк: {LICENSEE.bank}<br />БИК: {LICENSEE.bik}<br />Город банка: {LICENSEE.bankCity}<br />Корр. счёт: {LICENSEE.correspondentAccount}<br />Email: {LICENSEE.email}</p><div className="signature-space">{signatureMark}</div><i>{signatureCaption} · факсимиле</i></div></div>
+    <div className="signature-section"><h3>9. РЕКВИЗИТЫ И ПОДПИСИ</h3><div className="signature-grid"><div><span>ЛИЦЕНЗИАР</span><strong>{display(data.licensorName)}</strong><p>Паспорт: {display(data.passportSeriesNumber)}<br />Выдан: {display(data.passportIssuedBy)}<br />Дата выдачи: {formatDate(data.passportIssueDate)}<br />Банковские реквизиты: {display(data.bankDetails)}<br />Email: {display(data.email)}</p><div className="signature-space" /><i>{signatureCaption}</i></div><div><span>ЛИЦЕНЗИАТ</span><strong>{LICENSEE.name}</strong><p>Дата рождения: {LICENSEE.birthDate}<br />Паспорт: {LICENSEE.passport}<br />Выдан: {LICENSEE.passportIssuedBy}<br />ИНН: {LICENSEE.inn}<br />Расчётный счёт: {LICENSEE.account}<br />Банк: {LICENSEE.bank}<br />БИК: {LICENSEE.bik}<br />Город банка: {LICENSEE.bankCity}<br />Корр. счёт: {LICENSEE.correspondentAccount}<br />Email: {LICENSEE.email}</p><div className="signature-space">{signatureMark}</div><i>{signatureCaption} · факсимиле</i></div></div></div>
     <div className="paper-break" />
-    <h1 className="appendix-title">ПРИЛОЖЕНИЕ № 1<br /><small>к договору DREAM MOTION № {display(data.contractNumber, "ОБРАЗЕЦ")}</small></h1><h2>ПЕРЕЧЕНЬ И АКТ ПЕРЕДАЧИ ОБЪЕКТОВ</h2><p><b>Релиз:</b> {display(data.workTitle)}. <b>Исполнитель:</b> {display(data.pseudonym)}. <b>Тип:</b> {data.releaseType}.</p><table className="objects"><thead><tr><th>№</th><th>Название и версия</th><th>Исполнители</th><th>Автор текста</th><th>Автор музыки</th></tr></thead><tbody>{objects.map((track, index) => <tr key={`${track.title}-${index}`}><td>{index + 1}</td><td>{display(track.title, "Название трека")}</td><td>{display(data.pseudonym)}</td><td>{track.noLyrics ? "Инструментал" : display(track.lyricsAuthor)}</td><td>{display(track.musicAuthor)}</td></tr>)}</tbody></table><p><b>1.</b> Лицензиар передал, а Лицензиат принял перечисленные Объекты и сведения о них через информационную систему Лицензиата.</p><p><b>2.</b> Лицензиар подтверждает достоверность перечня и принадлежность ему прав, необходимых для предоставления лицензии по Договору.</p><p><b>3.</b> Приложение составлено в письменной форме и является неотъемлемой частью Договора.</p>
-    <div className="paper-break" /><h1 className="appendix-title">ДОПОЛНИТЕЛЬНОЕ СОГЛАШЕНИЕ<br /><small>к договору DREAM MOTION № {display(data.contractNumber, "ОБРАЗЕЦ")}</small></h1><p><b>1.</b> Для релиза «{display(data.workTitle)}» применяются индивидуальные условия.</p><p><b>2.</b> Вознаграждение Лицензиара составляет <b>{data.artistShare}%</b> чистых поступлений, рассчитанных в соответствии с разделом 4 Договора.</p><p><b>3.</b> Минимальная накопленная сумма для выплаты определяется Сторонами отдельно.</p><p><b>4.</b> Невыплаченный остаток сохраняется за Лицензиаром и переносится на следующие расчётные периоды.</p><div className="signature-grid"><div><span>ЛИЦЕНЗИАР</span><strong>{display(data.licensorName)}</strong><div className="signature-space" /><i>{signatureCaption}</i></div><div><span>ЛИЦЕНЗИАТ</span><strong>{LICENSEE.name}</strong><div className="signature-space">{signatureMark}</div><i>{signatureCaption} · факсимиле</i></div></div>
+    <div className="paper-break" /><h1 className="appendix-title">ПРИЛОЖЕНИЕ № 1<br /><small>к договору DreamMotion № {display(data.contractNumber, "ОБРАЗЕЦ")}</small></h1><h2>ПЕРЕЧЕНЬ И АКТ ПЕРЕДАЧИ ОБЪЕКТОВ</h2><p><b>Релиз:</b> {display(data.workTitle)}. <b>Исполнитель:</b> {display(data.pseudonym)}. <b>Тип:</b> {data.releaseType}.</p><table className="objects"><thead><tr><th>№</th><th>Название и версия</th><th>Исполнители</th><th>Автор текста</th><th>Автор музыки</th></tr></thead><tbody>{objects.map((track, index) => <tr key={`${track.title}-${index}`}><td>{index + 1}</td><td>{display(track.title, "Название трека")}</td><td>{display(data.pseudonym)}</td><td>{track.noLyrics ? "Инструментал" : display(track.lyricsAuthor)}</td><td>{display(track.musicAuthor)}</td></tr>)}</tbody></table><p><b>1.</b> Лицензиар передал, а Лицензиат принял перечисленные Объекты и сведения о них через информационную систему Лицензиата.</p><p><b>2.</b> Лицензиар подтверждает достоверность перечня и принадлежность ему прав, необходимых для предоставления лицензии по Договору.</p><p><b>3.</b> Приложение составлено в письменной форме и является неотъемлемой частью Договора.</p>
+    <div className="paper-break" /><h1 className="appendix-title">ДОПОЛНИТЕЛЬНОЕ СОГЛАШЕНИЕ<br /><small>к договору DreamMotion № {display(data.contractNumber, "ОБРАЗЕЦ")}</small></h1><p><b>1.</b> Для релиза «{display(data.workTitle)}» применяются индивидуальные условия.</p><p><b>2.</b> Вознаграждение Лицензиара составляет <b>{data.artistShare}%</b> чистых поступлений, рассчитанных в соответствии с разделом 4 Договора.</p><p><b>3.</b> Минимальная накопленная сумма для выплаты определяется Сторонами отдельно.</p><p><b>4.</b> Невыплаченный остаток сохраняется за Лицензиаром и переносится на следующие расчётные периоды.</p><div className="signature-section"><div className="signature-grid"><div><span>ЛИЦЕНЗИАР</span><strong>{display(data.licensorName)}</strong><div className="signature-space" /><i>{signatureCaption}</i></div><div><span>ЛИЦЕНЗИАТ</span><strong>{LICENSEE.name}</strong><div className="signature-space">{signatureMark}</div><i>{signatureCaption} · факсимиле</i></div></div></div>
   </article>;
 }
 
@@ -149,21 +161,23 @@ export default function Home() {
     const today = currentDate();
     let saved: Partial<Contract> = {};
     try {
-      const raw = window.localStorage.getItem("pfv-contract-draft");
+      const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
       const parsed = raw ? JSON.parse(raw) : {};
       if (parsed && typeof parsed === "object") saved = parsed as Partial<Contract>;
     } catch { /* Ignore an invalid local draft and use the blank contract. */ }
     const hydrateTimeout = window.setTimeout(() => {
       const savedTariff = typeof saved.tariff === "string" ? saved.tariff.trim() : "";
       const oldPreset = ["Премиум", "Стандарт", "Базовый", "Индивидуальные условия"].includes(savedTariff);
-      setData({ ...initial, ...saved, tariff: oldPreset ? "" : savedTariff, contractDate: today, tracks: normalizeTracks(saved.tracks, saved) });
+      const savedNumber = typeof saved.contractNumber === "string" ? saved.contractNumber.trim() : "";
+      const contractNumber = savedNumber && !savedNumber.includes("____") ? savedNumber : generateContractNumber();
+      setData({ ...initial, ...saved, tariff: oldPreset ? "" : savedTariff, contractDate: saved.contractDate || today, contractNumber, tracks: normalizeTracks(saved.tracks, saved) });
       setHydrated(true);
     }, 0);
     return () => window.clearTimeout(hydrateTimeout);
   }, []);
   useEffect(() => {
     if (!hydrated) return;
-    const timeout = window.setTimeout(() => { window.localStorage.setItem("pfv-contract-draft", JSON.stringify(data)); }, 350);
+    const timeout = window.setTimeout(() => { window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(data)); }, 350);
     return () => window.clearTimeout(timeout);
   }, [data, hydrated]);
   const update = <K extends keyof Contract>(key: K, value: Contract[K]) => setData((current) => ({ ...current, [key]: value }));
@@ -171,7 +185,7 @@ export default function Home() {
   const downloadDocument = async () => {
     const preview = document.getElementById("document-preview");
     if (!preview) return;
-    const fileName = (data.contractNumber || "dream-motion-contract").replace(/[^a-zа-яё0-9_-]+/gi, "-");
+    const fileName = (data.contractNumber || "dreammotion-contract").replace(/[^a-zа-яё0-9_-]+/gi, "-");
     let signatureDataUrl = new URL(SIGNATURE_SRC, window.location.href).href;
     try {
       const response = await fetch(SIGNATURE_SRC);
@@ -184,7 +198,7 @@ export default function Home() {
       });
     } catch { /* Keep the absolute asset URL as a fallback. */ }
     const previewHtml = preview.outerHTML.replaceAll(`src="${SIGNATURE_SRC}"`, `src="${signatureDataUrl}"`);
-    const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Лицензионный договор Dream Motion</title><style>@page{size:A4;margin:16mm 18mm}*{box-sizing:border-box}body{margin:0;background:#fff;color:#292a2d;font:10pt/1.56 Georgia,serif}.paper{width:100%;box-shadow:none}.paper-header{text-align:center;padding:0 0 17px}.paper h1{font-size:17pt;margin:0}.paper-contract-number{text-align:center;margin-top:8px}.paper-meta{display:flex;justify-content:space-between;font-size:9pt;margin:18px 0 22px}.paper p{margin:8px 0}.paper h3{font-size:11pt;margin:21px 0 7px}.paper-break{break-before:page;height:0;border:0;margin:0}.objects{border-collapse:collapse;width:100%;font-size:9pt;margin:13px 0;table-layout:fixed}.objects th,.objects td{border:1px solid #aaa;padding:5px 6px;text-align:left;overflow-wrap:anywhere}.objects th{background:#f1eee5}.signature-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:42px;font-size:9pt}.signature-grid span,.signature-grid strong,.signature-grid i{display:block}.signature-grid strong{margin:11px 0 18px;min-height:24px}.signature-space{min-height:56px;display:flex;align-items:flex-end;margin-top:20px;margin-bottom:8px}.signature-image{display:block;width:130px;height:56px;object-fit:contain;object-position:left bottom;margin:0 0 4px}.signature-grid i{border-top:1px solid #777;padding-top:5px;font-style:normal}</style></head><body>${previewHtml}</body></html>`;
+    const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Лицензионный договор DreamMotion</title><style>@page{size:A4;margin:16mm 18mm}*{box-sizing:border-box}body{margin:0;background:#fff;color:#292a2d;font:10pt/1.56 Georgia,serif}.paper{width:100%;box-shadow:none}.paper-header{text-align:center;padding:0 0 17px}.paper h1{font-size:17pt;margin:0}.paper-contract-number{text-align:center;margin-top:8px}.paper-meta{display:flex;justify-content:space-between;font-size:9pt;margin:18px 0 22px}.paper p{margin:8px 0}.paper h3{font-size:11pt;margin:21px 0 7px}.paper-break{break-before:page;height:0;border:0;margin:0}.objects{border-collapse:collapse;width:100%;font-size:9pt;margin:13px 0;table-layout:fixed}.objects th,.objects td{border:1px solid #aaa;padding:5px 6px;text-align:left;overflow-wrap:anywhere}.objects th{background:#f1eee5}.signature-section,.signature-grid{break-inside:avoid;page-break-inside:avoid}.signature-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:42px;font-size:9pt}.signature-grid span,.signature-grid strong,.signature-grid i{display:block}.signature-grid strong{margin:11px 0 18px;min-height:24px}.signature-space{min-height:56px;display:flex;align-items:flex-end;margin-top:20px;margin-bottom:8px}.signature-image{display:block;width:130px;height:56px;object-fit:contain;object-position:left bottom;margin:0 0 4px}.signature-grid i{border-top:1px solid #777;padding-top:5px;font-style:normal}</style></head><body>${previewHtml}</body></html>`;
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -200,7 +214,7 @@ export default function Home() {
   };
   const printDocument = () => window.print();
   return <main className="app-shell">
-    <header className="topbar"><div className="brand"><div className="brand-mark">DM/LM</div></div><div className="top-actions"><button className="ghost-button" onClick={printDocument}>Печать / PDF</button><button className="primary-button" onClick={downloadDocument}>Скачать договор</button></div></header>
+    <header className="topbar"><div className="brand"><div className="brand-mark">DreamMotion</div></div><div className="top-actions"><button className="ghost-button" onClick={printDocument}>Печать / PDF</button><button className="primary-button" onClick={downloadDocument}>Скачать договор</button></div></header>
     <div className="workspace">
       <section className="form-column">
         <section className="form-section" id="objects"><SectionTitle number="01" title="Объекты договора" caption="Название релиза и треки для Приложения № 1" /><div className="form-grid two"><Field label="Название релиза" value={data.workTitle} onChange={(value) => update("workTitle", value)} placeholder="Например, Последний танец" /><Field label="Исполнитель / псевдоним" value={data.pseudonym} onChange={(value) => update("pseudonym", value)} placeholder="Как указать в договоре" /><label className="field"><span>Тип релиза</span><select value={data.releaseType} onChange={(event) => update("releaseType", event.target.value)}><option>Сингл</option><option>EP</option><option>Альбом</option></select></label></div><div className="tracks-block"><div className="subhead"><div><b>Перечень треков</b><span>Для сингла оставьте одну строку; для EP и альбома добавьте остальные.</span></div><button className="text-button" onClick={() => update("tracks", [...data.tracks, { title: "", musicAuthor: "", lyricsAuthor: "", noLyrics: false }])}>+ Добавить трек</button></div>{data.tracks.map((track, index) => <div className="track-entry" key={index}><div className="track-row simple"><span className="track-index">{String(index + 1).padStart(2, "0")}</span><input aria-label={`Название трека ${index + 1}`} placeholder="Название трека" value={track.title} onChange={(event) => update("tracks", data.tracks.map((item, i) => i === index ? { ...item, title: event.target.value } : item))} />{data.tracks.length > 1 && <button className="remove-button" onClick={() => update("tracks", data.tracks.filter((_, i) => i !== index))}>×</button>}</div><div className="track-authors"><input className="track-inline-input" aria-label={`Автор музыки трека ${index + 1}`} placeholder="Автор музыки / композитор" value={track.musicAuthor} onChange={(event) => update("tracks", data.tracks.map((item, i) => i === index ? { ...item, musicAuthor: event.target.value } : item))} /><input className="track-inline-input" aria-label={`Автор текста трека ${index + 1}`} placeholder="Автор текста" value={track.lyricsAuthor} onChange={(event) => update("tracks", data.tracks.map((item, i) => i === index ? { ...item, lyricsAuthor: event.target.value } : item))} /><label className="check small"><input type="checkbox" checked={track.noLyrics} onChange={(event) => update("tracks", data.tracks.map((item, i) => i === index ? { ...item, noLyrics: event.target.checked } : item))} /><span>Инструментал</span></label></div></div>)}</div></section>
