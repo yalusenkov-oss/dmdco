@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 type Track = { title: string; musicAuthor: string; lyricsAuthor: string; noLyrics: boolean };
 type SignatureMethod = "manual" | "facsimile" | "online";
 type Contract = {
+  createdAt: string;
   contractDate: string;
   contractNumber: string;
   tariff: string;
@@ -49,6 +50,7 @@ const SIGNATURE_METHOD_LABELS: Record<SignatureMethod, string> = {
 
 const initial: Contract = {
   // Keep the server render deterministic. The creation date is filled after mount.
+  createdAt: "",
   contractDate: "",
   contractNumber: "",
   tariff: "",
@@ -88,13 +90,14 @@ function normalizeTracks(raw: unknown, legacy: Partial<Contract> = {}): Track[] 
 }
 
 function formatDate(value: string) {
-  if (!value) return "«___» __________ 2026 г.";
-  return new Date(`${value}T00:00:00`).toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" });
+  if (!value) return `«___» __________ ${new Date().getFullYear()} г.`;
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return value;
+  return new Intl.DateTimeFormat("ru-RU", { timeZone: "UTC", day: "2-digit", month: "long", year: "numeric" }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
 function currentDate() {
-  const now = new Date();
-  return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Moscow", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 
 function generateContractNumber() {
@@ -170,7 +173,10 @@ export default function Home() {
       const oldPreset = ["Премиум", "Стандарт", "Базовый", "Индивидуальные условия"].includes(savedTariff);
       const savedNumber = typeof saved.contractNumber === "string" ? saved.contractNumber.trim() : "";
       const contractNumber = savedNumber && !savedNumber.includes("____") ? savedNumber : generateContractNumber();
-      setData({ ...initial, ...saved, tariff: oldPreset ? "" : savedTariff, contractDate: saved.contractDate || today, contractNumber, tracks: normalizeTracks(saved.tracks, saved) });
+      const savedCreatedAt = typeof saved.createdAt === "string" ? saved.createdAt.trim() : "";
+      const createdAt = savedCreatedAt || new Date().toISOString();
+      const contractDate = savedCreatedAt ? (saved.contractDate || today) : today;
+      setData({ ...initial, ...saved, createdAt, tariff: oldPreset ? "" : savedTariff, contractDate, contractNumber, tracks: normalizeTracks(saved.tracks, saved) });
       setHydrated(true);
     }, 0);
     return () => window.clearTimeout(hydrateTimeout);
