@@ -17,7 +17,7 @@ test("server-renders the contract generator controls", async () => {
   const html = await response.text();
   assert.match(html, /<title>DreamMotion<\/title>/);
   assert.match(html, /Сбросить всё/);
-  assert.match(html, /Сохранить PDF/);
+  assert.match(html, /Скачать PDF/);
   assert.match(html, /ЛИЦЕНЗИОННЫЙ ДОГОВОР/);
   assert.match(html, /1 000 \(одна тысяча\) рублей/);
 });
@@ -37,6 +37,9 @@ test("document export keeps page sections and strips the site name from the cont
   assert.doesNotMatch(page, /paper-break/);
   assert.doesNotMatch(page, /ЛИЦЕНЗИОННЫЙ ДОГОВОР DreamMotion/);
   assert.match(page, /Минимальная накопленная сумма для выплаты составляет <b>1 000/);
+  assert.match(page, /<th>Смежные права<\/th><th>Авторские права<\/th>/);
+  assert.match(page, /<td>100%<\/td><td>100%<\/td>/);
+  assert.doesNotMatch(page, /link\.download = `\$\{fileName\}\.html`/);
   assert.match(css, /\.document-section \{ break-before:page; page-break-before:always;/);
   assert.match(css, /\.addendum-section \{ break-inside:avoid; page-break-inside:avoid;/);
   assert.match(css, /@page \{ size:A4; margin:10mm 18mm 14mm; \}/);

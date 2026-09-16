@@ -82,6 +82,8 @@ body { background:#f5f5f5; }
 .paper-header { padding-top:12px; }
 .document-section { margin-top:38px; }
 .signature-section,.signature-grid,.addendum-section { break-inside:avoid; page-break-inside:avoid; }
+.rights-table { font-size:7px; }
+.rights-table th,.rights-table td { padding:4px 3px; }
 @media print {
   @page { size:A4; margin:10mm 18mm 14mm; }
   .paper { padding:0; }
